@@ -2,6 +2,7 @@ html,
 body {
   margin: 0;
   height: 100%;
+  position: relative;
 }
 
 #mapid {
@@ -13,4 +14,25 @@ g {
 }
 g path[stroke-opacity] {
   opacity: 1;
+}
+
+.input-wrap {
+  position: absolute;
+  width: calc(100vw - 2rem);
+  max-width: 600px;
+  z-index: 1000;
+  margin: 1rem auto;
+  padding: 1rem;
+  top: 0;
+  left: 0;
+  right: 0;
+  background-color: white;
+  border-radius: 4px;
+  display: flex;
+
+  input {
+    flex: 1 0 auto;
+    font-size: 1.5rem;
+    padding: 0.5rem;
+  }
 }

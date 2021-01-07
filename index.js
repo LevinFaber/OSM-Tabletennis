@@ -1,4 +1,8 @@
-// import { geojson } from "./cologne";
+let GLOBAL_POINTS = [];
+let GLOBAL_GEO = null;
+
+
+
 const mapInstance = L.map('mapid').setView([50.937599587518676, 6.954994823413924], 10);
 L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -11,26 +15,65 @@ L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
 
 // Search GEOJSON
 async function searchPlace(name) {
+
     const response = await (fetch(`https://nominatim.openstreetmap.org/search.php?q=${name}&polygon_geojson=1&accept-language=de&countrycodes=de&polygon_threshold=0.001&format=jsonv2`).catch(e => console.error(e)));
-    
+
     const data = await response.json();
-
     if (data) {
-        const place = data[0];
-        const geojson = place.geojson;
-        const points = geojson.coordinates[0];
-        points.forEach((point) => {
-            L.circle([point[1], point[0]], {radius: 15000, stroke: 0, fillOpacity: 1}).addTo(mapInstance);
-        });
+        processData(data, name);
+    }
 
-        L.geoJSON(geojson, { style: { color: "#FF0"}}).addTo(mapInstance);
+
+}
+
+function processData(data, query, poped = false) {
+    const place = data.find(result => result.category === "boundary" && result.type === "administrative");
+
+    if (place) {
+        clearOverlay();
+        input.value = ""; input.placeholder = place.display_name;
+
+        mapInstance.setView([place.lat, place.lon], 9);
+
+        if (!poped) {
+            const newUrl = new URL(window.location.href);
+            newUrl.pathname = `/${capitalize(query)}`;
+            window.history.pushState({ data, query }, "", newUrl.href);
+            setTitle(query);
+        }
+
+        const geojson = place.geojson;
+        const points = geojson.type === "MultiPolygon" ? geojson.coordinates[0][0] : geojson.coordinates[0];
+        GLOBAL_POINTS = points.map((point) => L.circle([point[1], point[0]], { radius: 15000, stroke: 0, fillOpacity: 1 }).addTo(mapInstance));
+        GLOBAL_GEO = L.geoJSON(geojson, { style: { color: "#FF0" } }).addTo(mapInstance);
     }
 }
 
-const query = window.location.pathname.slice(1);
+function setTitle(place) {
+    const decoded  = decodeURIComponent(place);
+    window.document.title = `${capitalize(decoded)} plus 15km`
+}
+function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1)}
+function clearOverlay() {
+    GLOBAL_POINTS.forEach((px) => { mapInstance.removeLayer(px) });
+    if (GLOBAL_GEO) mapInstance.removeLayer(GLOBAL_GEO);
+}
+
+const query = window.location.pathname.slice(1) || "Köln";
 searchPlace(query);
 
+const form = document.querySelector("form");
+const input = document.querySelector("input");
+form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    searchPlace(input.value);
+})
 
+window.onpopstate = function (e) {
+    if (e.state) {
+        processData(e.state.data, e.state.query, true);
+    }
+};
 
 
 
