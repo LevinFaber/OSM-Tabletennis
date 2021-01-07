@@ -51,7 +51,7 @@ function processData(data, query, poped = false) {
 
 function setTitle(place) {
     const decoded  = decodeURIComponent(place);
-    window.document.title = `${capitalize(decoded)} plus 15km`
+    window.document.title = `${capitalize(decoded)} + 15km`
 }
 function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1)}
 function clearOverlay() {
