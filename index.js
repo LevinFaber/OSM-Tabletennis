@@ -43,7 +43,7 @@ function processData(data, query, poped = false) {
         }
 
         const geojson = place.geojson;
-        const points = geojson.type === "MultiPolygon" ? geojson.coordinates[0][0] : geojson.coordinates[0];
+        const points = geojson.type === "MultiPolygon" ? geojson.coordinates.flat(2) : geojson.coordinates.flat();
         GLOBAL_POINTS = points.map((point) => L.circle([point[1], point[0]], { radius: 15000, stroke: 0, fillOpacity: 1 }).addTo(mapInstance));
         GLOBAL_GEO = L.geoJSON(geojson, { style: { color: "#FF0" } }).addTo(mapInstance);
     }
