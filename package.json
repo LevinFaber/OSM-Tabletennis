@@ -1,0 +1,15 @@
+{
+  "name": "koeln_plus_15",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "pacel build index.html",
+    "dev": "pacel index.html"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "sass": "^1.32.2"
+  }
+}
