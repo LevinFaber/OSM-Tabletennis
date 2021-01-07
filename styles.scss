@@ -1,4 +1,5 @@
-html, body { 
+html,
+body {
   margin: 0;
   height: 100%;
 }
@@ -7,4 +8,9 @@ html, body {
   height: 100%;
 }
 
-g {opacity: 0.3;}
+g {
+  opacity: 0.3;
+}
+g path[stroke-opacity] {
+  opacity: 1;
+}

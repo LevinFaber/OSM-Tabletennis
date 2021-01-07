@@ -13,3 +13,5 @@ const points = geojson.features[0].geometry.coordinates[0][0];
 points.forEach((point) => {
     L.circle([point[1], point[0]], {radius: 15000, stroke: 0, fillOpacity: 1}).addTo(mapInstance);
 });
+
+L.geoJSON(geojson, { style: { color: "#FF0"}}).addTo(mapInstance);
