@@ -4,12 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "pacel build index.html",
-    "dev": "pacel index.html"
+    "build": "parcel build index.html",
+    "dev": "parcel index.html"
   },
   "author": "",
   "license": "ISC",
-  "devDependencies": {
-    "sass": "^1.32.2"
+  "dependencies": {
+    "parcel-bundler": "^1.12.4"
   }
 }
