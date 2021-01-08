@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "build": "parcel build index.html",
+    "build": "parcel build index.html && cp ./_redirects ./dist/_redirects",
     "dev": "parcel index.html"
   },
   "author": "",
