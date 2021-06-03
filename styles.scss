@@ -36,3 +36,19 @@ g path[stroke-opacity] {
     padding: 0.5rem;
   }
 }
+
+#loading {
+  display: none;
+  pointer-events: none;
+  background: rgba(0, 0, 0, 0.404);
+  z-index: 999;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+
+  &.active {
+    display: block;
+  }
+}

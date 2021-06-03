@@ -1,7 +1,4 @@
-let GLOBAL_POINTS = [];
-let GLOBAL_GEO = null;
-
-
+const INTERPRETER = "https://lz4.overpass-api.de/api/interpreter";
 
 const mapInstance = L.map('mapid').setView([50.937599587518676, 6.954994823413924], 10);
 L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
@@ -13,67 +10,239 @@ L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
     accessToken: 'pk.eyJ1IjoibGZhLXRpbWV0b2FjdCIsImEiOiJjazQwMzVpMnAxdnl0M2xvcGR6MTN1NXJyIn0.Im9rwBa3gF7jjD3cUUlzlg'
 }).addTo(mapInstance);
 
-// Search GEOJSON
-async function searchPlace(name) {
+function init() {
+    window.knownChunks = [];
+    window.drawnMarkers = [];
+    initalizeFromLocalstorage();
+    startGettingNewData();
+    mapInstance.on('moveend', () => {
+        startGettingNewData();
+    });
 
-    const response = await (fetch(`https://nominatim.openstreetmap.org/search.php?q=${name}&polygon_geojson=1&accept-language=de&countrycodes=de&polygon_threshold=0.001&format=jsonv2`).catch(e => console.error(e)));
-
-    const data = await response.json();
-    if (data) {
-        processData(data, name);
-    }
-
-
+    /*     mapInstance.on('zoomend', () => {
+            removeMarkers();
+        }); */
 }
+init();
 
-function processData(data, query, poped = false) {
-    const place = data.find(result => result.category === "boundary" && result.type === "administrative");
+function initalizeFromLocalstorage() {
+    const data = localStorage.getItem("knownChunks");
 
-    if (place) {
-        clearOverlay();
-        input.value = ""; input.placeholder = place.display_name;
-
-        mapInstance.setView([place.lat, place.lon], 9);
-
-        if (!poped) {
-            const newUrl = new URL(window.location.href);
-            newUrl.pathname = `/${capitalize(query)}`;
-            window.history.pushState({ data, query }, "", newUrl.href);
-            setTitle(query);
+    if (data != null) {
+        window.knownChunks = JSON.parse(data);
+    }
+    const limit = mapInstance.getBounds();
+    window.knownChunks.forEach(chunk => {
+        if (Array.isArray(chunk)) {
+            chunk.forEach(slot => {
+                if (Array.isArray(slot)) {
+                    slot.forEach(markerData => { addMarker(markerData, limit) });
+                }
+            })
         }
+    })
+}
 
-        const geojson = place.geojson;
-        const points = geojson.type === "MultiPolygon" ? geojson.coordinates.flat(2) : geojson.coordinates.flat();
-        GLOBAL_POINTS = points.map((point) => L.circle([point[1], point[0]], { radius: 15000, stroke: 0, fillOpacity: 1 }).addTo(mapInstance));
-        GLOBAL_GEO = L.geoJSON(geojson, { style: { color: "#FF0" } }).addTo(mapInstance);
+function isInBounds(lat, lng, limit) {
+    const { _southWest: lower, _northEast: upper } = limit;
+    return lower.lat < lat && lower.lng < lng && upper.lat > lat && upper.lng > lng
+}
+
+function addMarker(markerData, limit = null) {
+    const { lat, lon, tags } = markerData;
+    if (limit) {
+        if (!(isInBounds(lat, lon, limit))) {
+            return;
+        }
+    }
+
+    const exists = window.drawnMarkers.findIndex(({ _latlng }) => _latlng.lat === lat && _latlng.lng === lon);
+    if (exists != -1) {
+        return
+    }
+
+    const marker = L.marker([lat, lon])
+    marker.addTo(mapInstance);
+    window.drawnMarkers.push(marker);
+    if (tags) {
+        const popupText = Object.entries(tags)
+            .filter(([tagName]) => tagName != "leisure" || tagName != "sport")
+            .reduce((acc, curr) => {
+                return acc + `${curr[0]}: ${curr[1]}<br>`;
+            }, "");
+
+        marker.bindPopup(popupText);
+
+        marker.on('mouseover', function (e) {
+            this.openPopup();
+        });
+        marker.on('mouseout', function (e) {
+            this.closePopup();
+        });
+        marker.on('touch', function (e) {
+            this.openPopup();
+        });
+    }
+
+    if (window.drawnMarkers.length > 600) {
+        removeMarkers();
     }
 }
 
-function setTitle(place) {
-    const decoded  = decodeURIComponent(place);
-    window.document.title = `${capitalize(decoded)} + 15km`
-}
-function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1)}
-function clearOverlay() {
-    GLOBAL_POINTS.forEach((px) => { mapInstance.removeLayer(px) });
-    if (GLOBAL_GEO) mapInstance.removeLayer(GLOBAL_GEO);
-}
-
-const query = window.location.pathname.slice(1) || "Köln";
-searchPlace(query);
-
-const form = document.querySelector("form");
-const input = document.querySelector("input");
-form.addEventListener("submit", (e) => {
-    e.preventDefault();
-    searchPlace(input.value);
-})
-
-window.onpopstate = function (e) {
-    if (e.state) {
-        processData(e.state.data, e.state.query, true);
+function removeMarkers() {
+    const limit = mapInstance.getBounds();
+    for (let i = 0; i < window.drawnMarkers.length; i++) {
+        const marker = window.drawnMarkers[i];
+        const { _latlng } = marker;
+        if (!isInBounds(_latlng.lat, _latlng.lng, limit) || mapInstance.getZoom() < 13) {
+            mapInstance.removeLayer(marker);
+            window.drawnMarkers[i] = false;
+        }
     }
-};
+
+    window.drawnMarkers = window.drawnMarkers.filter(Boolean);
+}
+
+async function startGettingNewData() {
+    const center = mapInstance.getCenter();
+    const { bounds, ids } = getChunkId(center);
+    const knownChunk = checkCoords(ids);
+    if (knownChunk === null) {
+        const query = getQueryForBounds(bounds);
+        const data = await sendQuery(query);
+        if (data) {
+            const validMakers = data.elements.filter(marker => marker.lat != null && marker.lon != null);
+
+            addChunk(ids, validMakers);
+            validMakers.forEach(markerData => { addMarker(markerData) });
+
+            /*             const leafletBounds = [[bounds.southWest.lat, bounds.southWest.lng], [bounds.northEast.lat, bounds.northEast.lng]];
+                        L.rectangle(leafletBounds, { color: "#ff7800", weight: 1 }).addTo(mapInstance); */
+        }
+    } else {
+        knownChunk.forEach(markerData => { addMarker(markerData) });
+    }
+}
+
+async function sendQuery(query) {
+    try {
+        setLoading(true);
+        const response = await fetch(INTERPRETER, {
+            body: `data=${query}`,
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            method: "POST",
+        });
+
+        const body = await response.json();
+        return body;
+    } catch (error) {
+        console.error(error);
+    } finally {
+        setLoading(false);
+    }
+}
+
+function checkCoords(ids) {
+    const [a, b] = ids;
+
+    if (knownChunks[a] && knownChunks[a][b]) {
+        console.log("Chunk founds");
+        return knownChunks[a][b];
+    } else {
+        console.log("New chunk");
+        return null;
+    }
+}
+
+function addChunk(ids, data) {
+    const [a, b] = ids;
+    if (knownChunks[a] == null) {
+        knownChunks[a] = [];
+    }
+    knownChunks[a][b] = data;
+    updateLocalstorage();
+}
+
+function tenth(num, offset = 0) {
+    let tenTimes = Math.floor(num * 10);
+    tenTimes += offset * 10;
+    const rounded = Math.round(tenTimes);
+    return rounded / 10;
+}
+
+function getChunkId({ lat, lng }) {
+    const rootCoords = {
+        lat: tenth(lat),
+        lng: tenth(lng)
+    };
+
+    if ((rootCoords.lat * 10) % 2 === 1) {
+        rootCoords.lat = tenth(rootCoords.lat, -0.1);
+    }
+
+    if ((rootCoords.lng * 10) % 2 === 1) {
+        rootCoords.lng = tenth(rootCoords.lng, -0.1);
+    }
 
 
+    const bounds = {
+        southWest: {
+            lat: rootCoords.lat,
+            lng: rootCoords.lng
+        },
+        northEast: {
+            lat: tenth(rootCoords.lat, 0.2),
+            lng: tenth(rootCoords.lng, 0.2),
+        }
+    }
+    const ids = [
+        rootCoords.lat * 10,
+        rootCoords.lng * 10
+    ];
 
+    return {
+        ids,
+        bounds
+    };
+}
+
+function updateLocalstorage() {
+    const str = JSON.stringify(knownChunks);
+    localStorage.setItem("knownChunks", str);
+}
+
+function setLoading(setTo) {
+    const overlay = document.querySelector("#loading")
+    isLoading = setTo;
+    if (setTo) {
+        overlay.classList.add("active");
+    } else {
+        overlay.classList.remove("active");
+    }
+}
+
+function getQueryForBounds(boundsObject) {
+    const { southWest: lower, northEast: upper } = boundsObject;
+    return dataTemplate(lower.lat, lower.lng, upper.lat, upper.lng);
+}
+function dataTemplate(bbLowerLat, bbLowerLng, bbUpperLat, bbUpperLng) {
+    return `/*
+This has been generated by the overpass-turbo wizard.
+The original search was:
+“sport=table_tennis”
+*/
+[out:json][timeout:25];
+// gather results
+(
+  // query part for: “sport=table_tennis”
+  node["sport"="table_tennis"](${bbLowerLat},${bbLowerLng},${bbUpperLat},${bbUpperLng});
+  way["sport"="table_tennis"](${bbLowerLat},${bbLowerLng},${bbUpperLat},${bbUpperLng});
+  relation["sport"="table_tennis"](${bbLowerLat},${bbLowerLng},${bbUpperLat},${bbUpperLng});
+);
+// print results
+out body;
+>;
+out skel qt;`
+}

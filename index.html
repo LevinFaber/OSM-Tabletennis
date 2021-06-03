@@ -1,39 +1,29 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>+ 15km</title>
-  <meta name="title" content="15km">
-  <meta name="description" content="15km um die Stadtgrenzen">
-  
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://15km.netlify.app/">
-  <meta property="og:title" content="... plus 15km">
-  <meta property="og:description" content="15km um die Stadtgrenzen">
-  <meta property="og:image" content="Meta.png">
-  
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image">
-  <meta property="twitter:url" content="https://15km.netlify.app/">
-  <meta property="twitter:title" content="... plus 15km">
-  <meta property="twitter:description" content="15km um die Stadtgrenzen">
-  <meta property="twitter:image" content="Meta.png">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
-  integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
-  crossorigin=""/>
- <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
-   integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
-   crossorigin=""></script>
-  <link rel="stylesheet" href="./styles.scss">
-</head>
-<body>
-  <div id="mapid"></div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Tischtennis</title>
+    <meta name="title" content="Tischtennisplatten" />
+    <meta name="description" content="Zeigt Tischtennisplatten von OSM" />
 
-  <form class="input-wrap">
-    <input type="text" id="query">
-  </div>
-  <script src="./index.js"></script>
-</body>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+      integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+      crossorigin=""
+    />
+    <script
+      src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+      integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+      crossorigin=""
+    ></script>
+    <link rel="stylesheet" href="./styles.scss" />
+  </head>
+  <body>
+    <div id="mapid"></div>
+    <div id="loading"></div>
+
+    <script src="./index.js"></script>
+  </body>
 </html>
