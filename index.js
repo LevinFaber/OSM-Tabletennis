@@ -9,6 +9,8 @@ L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
     zoomOffset: -1,
     accessToken: "pk.eyJ1IjoibGZhLXRpbWV0b2FjdCIsImEiOiJjazQwMzVpMnAxdnl0M2xvcGR6MTN1NXJyIn0.Im9rwBa3gF7jjD3cUUlzlg"
 }).addTo(mapInstance);
+const markerClusterGroup = L.markerClusterGroup();
+mapInstance.addLayer(markerClusterGroup);
 window.map = mapInstance;
 function init() {
     window.knownChunks = [];
@@ -17,7 +19,6 @@ function init() {
     reDrawMarkers();
     mapInstance.on("moveend", () => {
         reDrawMarkers();
-        removeMarkers();
     });
 
     /*     mapInstance.on('zoomend', () => {
@@ -49,13 +50,8 @@ function isInBounds(lat, lng, limit) {
     return lower.lat < lat && lower.lng < lng && upper.lat > lat && upper.lng > lng;
 }
 
-function addMarker(markerData, limit = null) {
+function addMarker(markerData) {
     const { lat, lon, tags } = markerData;
-    if (limit) {
-        if (!(isInBounds(lat, lon, limit))) {
-            return;
-        }
-    }
 
     const exists = window.drawnMarkers.findIndex(({ _latlng }) => _latlng.lat === lat && _latlng.lng === lon);
     if (exists != -1) {
@@ -63,7 +59,8 @@ function addMarker(markerData, limit = null) {
     }
 
     const marker = L.marker([lat, lon]);
-    marker.addTo(mapInstance);
+    markerClusterGroup.addLayer(marker);
+    // marker.addTo(mapInstance);
     window.drawnMarkers.push(marker);
     if (tags) {
         const popupText = Object.entries(tags)
@@ -86,7 +83,7 @@ function addMarker(markerData, limit = null) {
     }
 }
 
-function removeMarkers() {
+/* function removeMarkers() {
     const limit = mapInstance.getBounds();
     for (let i = 0; i < window.drawnMarkers.length; i++) {
         const marker = window.drawnMarkers[i];
@@ -98,7 +95,7 @@ function removeMarkers() {
     }
 
     window.drawnMarkers = window.drawnMarkers.filter(Boolean);
-}
+} */
 
 async function reDrawMarkers() {
     if (mapInstance.getZoom() > 11) {
