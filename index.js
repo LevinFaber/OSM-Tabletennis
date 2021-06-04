@@ -1,22 +1,23 @@
 const INTERPRETER = "https://lz4.overpass-api.de/api/interpreter";
 
-const mapInstance = L.map('mapid').setView([50.937599587518676, 6.954994823413924], 10);
-L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}', {
-    attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+const mapInstance = L.map("mapid").setView([50.937599587518676, 6.954994823413924], 10);
+L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}", {
+    attribution: "Map data &copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors, Imagery © <a href=\"https://www.mapbox.com/\">Mapbox</a>",
     maxZoom: 18,
-    id: 'mapbox/streets-v11',
+    id: "mapbox/streets-v11",
     tileSize: 512,
     zoomOffset: -1,
-    accessToken: 'pk.eyJ1IjoibGZhLXRpbWV0b2FjdCIsImEiOiJjazQwMzVpMnAxdnl0M2xvcGR6MTN1NXJyIn0.Im9rwBa3gF7jjD3cUUlzlg'
+    accessToken: "pk.eyJ1IjoibGZhLXRpbWV0b2FjdCIsImEiOiJjazQwMzVpMnAxdnl0M2xvcGR6MTN1NXJyIn0.Im9rwBa3gF7jjD3cUUlzlg"
 }).addTo(mapInstance);
-
+window.map = mapInstance;
 function init() {
     window.knownChunks = [];
     window.drawnMarkers = [];
     initalizeFromLocalstorage();
-    startGettingNewData();
-    mapInstance.on('moveend', () => {
-        startGettingNewData();
+    reDrawMarkers();
+    mapInstance.on("moveend", () => {
+        reDrawMarkers();
+        removeMarkers();
     });
 
     /*     mapInstance.on('zoomend', () => {
@@ -36,16 +37,16 @@ function initalizeFromLocalstorage() {
         if (Array.isArray(chunk)) {
             chunk.forEach(slot => {
                 if (Array.isArray(slot)) {
-                    slot.forEach(markerData => { addMarker(markerData, limit) });
+                    slot.forEach(markerData => { addMarker(markerData, limit); });
                 }
-            })
+            });
         }
-    })
+    });
 }
 
 function isInBounds(lat, lng, limit) {
     const { _southWest: lower, _northEast: upper } = limit;
-    return lower.lat < lat && lower.lng < lng && upper.lat > lat && upper.lng > lng
+    return lower.lat < lat && lower.lng < lng && upper.lat > lat && upper.lng > lng;
 }
 
 function addMarker(markerData, limit = null) {
@@ -58,10 +59,10 @@ function addMarker(markerData, limit = null) {
 
     const exists = window.drawnMarkers.findIndex(({ _latlng }) => _latlng.lat === lat && _latlng.lng === lon);
     if (exists != -1) {
-        return
+        return;
     }
 
-    const marker = L.marker([lat, lon])
+    const marker = L.marker([lat, lon]);
     marker.addTo(mapInstance);
     window.drawnMarkers.push(marker);
     if (tags) {
@@ -73,19 +74,15 @@ function addMarker(markerData, limit = null) {
 
         marker.bindPopup(popupText);
 
-        marker.on('mouseover', function (e) {
+        marker.on("mouseover", function (e) {
             this.openPopup();
         });
-        marker.on('mouseout', function (e) {
+        marker.on("mouseout", function (e) {
             this.closePopup();
         });
-        marker.on('touch', function (e) {
+        marker.on("touch", function (e) {
             this.openPopup();
         });
-    }
-
-    if (window.drawnMarkers.length > 600) {
-        removeMarkers();
     }
 }
 
@@ -94,7 +91,7 @@ function removeMarkers() {
     for (let i = 0; i < window.drawnMarkers.length; i++) {
         const marker = window.drawnMarkers[i];
         const { _latlng } = marker;
-        if (!isInBounds(_latlng.lat, _latlng.lng, limit) || mapInstance.getZoom() < 13) {
+        if (!isInBounds(_latlng.lat, _latlng.lng, limit)) {
             mapInstance.removeLayer(marker);
             window.drawnMarkers[i] = false;
         }
@@ -103,24 +100,52 @@ function removeMarkers() {
     window.drawnMarkers = window.drawnMarkers.filter(Boolean);
 }
 
-async function startGettingNewData() {
-    const center = mapInstance.getCenter();
-    const { bounds, ids } = getChunkId(center);
-    const knownChunk = checkCoords(ids);
-    if (knownChunk === null) {
-        const query = getQueryForBounds(bounds);
-        const data = await sendQuery(query);
-        if (data) {
-            const validMakers = data.elements.filter(marker => marker.lat != null && marker.lon != null);
+async function reDrawMarkers() {
+    if (mapInstance.getZoom() > 11) {
+        const { _northEast, _southWest } = mapInstance.getBounds();
+        const southWest = getChunkId(_southWest);
+        const northEast = getChunkId(_northEast);
+        const chunksToDraw = [];
 
-            addChunk(ids, validMakers);
-            validMakers.forEach(markerData => { addMarker(markerData) });
-
-            /*             const leafletBounds = [[bounds.southWest.lat, bounds.southWest.lng], [bounds.northEast.lat, bounds.northEast.lng]];
-                        L.rectangle(leafletBounds, { color: "#ff7800", weight: 1 }).addTo(mapInstance); */
+        for (let i = southWest.ids[0]; i <= northEast.ids[0]; i++) {
+            for (let j = southWest.ids[1]; j <= northEast.ids[1]; j++) {
+                chunksToDraw.push([i, j]);
+            }
         }
-    } else {
-        knownChunk.forEach(markerData => { addMarker(markerData) });
+
+        const elementsFromKnownChunks = [];
+        const missingChunks = [];
+        for (let chunkId of chunksToDraw) {
+            const knownElements = getChunk(chunkId);
+            if (knownElements === false) {
+                missingChunks.push(chunkId);
+            } else {
+                elementsFromKnownChunks.push(...knownElements);
+            }
+        }
+        console.log("Drawing Markers: ", elementsFromKnownChunks.length);
+        elementsFromKnownChunks.forEach((markerData) => { addMarker(markerData); });
+
+
+
+        const center = mapInstance.getCenter();
+        const { bounds, ids } = getChunkId(center);
+        const knownChunk = checkCoords(ids);
+        if (knownChunk === null) {
+            const query = getQueryForBounds(bounds);
+            const data = await sendQuery(query);
+            if (data) {
+                const validMakers = data.elements.filter(marker => marker.lat != null && marker.lon != null);
+
+                addChunk(ids, validMakers);
+                validMakers.forEach(markerData => { addMarker(markerData); });
+
+                /*             const leafletBounds = [[bounds.southWest.lat, bounds.southWest.lng], [bounds.northEast.lat, bounds.northEast.lng]];
+                            L.rectangle(leafletBounds, { color: "#ff7800", weight: 1 }).addTo(mapInstance); */
+            }
+        } else {
+            knownChunk.forEach(markerData => { addMarker(markerData); });
+        }
     }
 }
 
@@ -165,6 +190,17 @@ function addChunk(ids, data) {
     updateLocalstorage();
 }
 
+function getChunk(ids) {
+    const [a, b] = ids;
+    if (!Array.isArray(knownChunks[a])) {
+        return false;
+    }
+    if (!Array.isArray(knownChunks[a][b])) {
+        return false;
+    }
+    return knownChunks[a][b];
+}
+
 function tenth(num, offset = 0) {
     let tenTimes = Math.floor(num * 10);
     tenTimes += offset * 10;
@@ -196,7 +232,7 @@ function getChunkId({ lat, lng }) {
             lat: tenth(rootCoords.lat, 0.2),
             lng: tenth(rootCoords.lng, 0.2),
         }
-    }
+    };
     const ids = [
         rootCoords.lat * 10,
         rootCoords.lng * 10
@@ -214,7 +250,7 @@ function updateLocalstorage() {
 }
 
 function setLoading(setTo) {
-    const overlay = document.querySelector("#loading")
+    const overlay = document.querySelector("#loading");
     isLoading = setTo;
     if (setTo) {
         overlay.classList.add("active");
@@ -244,5 +280,5 @@ The original search was:
 // print results
 out body;
 >;
-out skel qt;`
+out skel qt;`;
 }
