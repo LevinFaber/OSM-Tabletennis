@@ -9,7 +9,10 @@ L.tileLayer("https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_toke
     zoomOffset: -1,
     accessToken: "pk.eyJ1IjoibGZhLXRpbWV0b2FjdCIsImEiOiJjazQwMzVpMnAxdnl0M2xvcGR6MTN1NXJyIn0.Im9rwBa3gF7jjD3cUUlzlg"
 }).addTo(mapInstance);
-const markerClusterGroup = L.markerClusterGroup();
+const markerClusterGroup = L.markerClusterGroup({
+    disableClusteringAtZoom: 16,
+    spiderfyOnMaxZoom: false,
+});
 mapInstance.addLayer(markerClusterGroup);
 window.map = mapInstance;
 function init() {
